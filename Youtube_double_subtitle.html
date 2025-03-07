@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double YouTube Player avec Contrôles</title>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+	
+		.video-url-container {
+			margin-top: 80px; /* Ajuste l'espacement selon ton besoin */
+			width: 1000px; /* largeur personnalisée */
+		}
+		
+		#videoUrl {
+			width: 520px; /* Ajuste cette valeur selon tes préférences */
+			padding: 5px;
+			font-size: 14px;
+		}
+		
+		.instructions {
+			margin-top: 20px;
+			font-size: 12px;
+			color: #555;
+			width: 630px;
+			padding-left: 8px;
+		}
+		
+        .player-container {
+            position: relative;
+            margin-top: 70px; /* Ajustement pour le titre ajouté */
+            height: 500px;
+        }
+        #player1, #player2 {
+            position: absolute;
+            transition: top 0.5s ease;
+        }
+        #player1 {
+            z-index: 2;
+        }
+        #player2 {
+            top: 0px;
+            z-index: 1;
+			margin-top: -50px;
+        }
+        .controls {
+            position: fixed;
+            top: 190px;
+            left: 8px;
+            z-index: 5;
+            background-color: white;
+            padding: 5px;
+            border-radius: 5px;
+			width: 630px;
+			height: 50px;
+			display: flex;
+			align-items: center;
+			justify-content: left;
+			gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+		
+		.controls button {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 5px;
+		}
+
+		.icon {
+			font-size: 14px;
+		}
+
+		/* Bouton Play (▶) */
+		.play-btn::before {
+			content: '▶';
+		}
+
+		/* Bouton Pause (⏸) */
+		.pause-btn::before {
+			content: '⏸';
+		}
+
+		/* Bouton Stop (⏹) */
+		.stop-btn::before {
+			content: '⏹';
+		}
+
+		
+		.title-banner {
+		    font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif; /* Impact est similaire au logo YouTube */
+			letter-spacing: -0.5px; /* légère compression horizontale similaire au logo */
+			font-size: 22px;
+			color: #282828;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 10px;
+			position: fixed;
+			top: 10px;
+			left: 150px;
+			transform: translateX(-50%);
+			background-color: white;
+			padding: 5px 10px;
+			border-radius: 5px;
+			box-shadow: none;
+			z-index: 10;
+		}
+
+		.title-banner img {
+			height: 24px; /* Taille du logo */
+			width: auto;
+		}
+    </style>
+</head>
+<body>
+
+	<div class="title-banner">
+		
+		<img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" 
+			 alt="YouTube Logo" >
+		<span> - double sous titre</span>
+	</div>
+
+	<div class="video-url-container">
+		<input type="text" id="videoUrl" placeholder="Simply Ctrl+C the YouTube URL or type it here, then load ->" >
+		<button onclick="chargerVideoDepuisInput()">Load Vidéo</button>
+		<div class="instructions">
+			- Arrow button (↓↑) = slide out the hidden second player and then adjust the subtitle settings.<br>
+			- "synchroniser" button = if the 2 players are desynchronised.<br>
+			- Keep the voice muted 🔇 on the second player.
+	</div>
+
+
+	<div class="controls">
+		<button class="play-btn" onclick="playVideos()"><span class="icon"></span>Play</button>
+		<button class="pause-btn" onclick="pauseVideos()"></button>
+		<button class="stop-btn" onclick="stopVideos()"></button>
+		<select id="speed" onchange="setPlaybackRate()">
+			<option value="0.5">0.5x</option>
+			<option value="0.75">0.75x</option>
+			<option value="1" selected>1x</option>
+			<option value="1.25">1.25x</option>
+			<option value="1.5">1.5x</option>
+			<option value="1.75">1.75x</option>
+			<option value="2">2x</option>
+		</select>
+		<button id="syncBtn" onclick="synchronizeVideos()">Synchroniser</button>
+		<button onclick="toggleSecondVideo()">↓↑</button>
+	</div>
+
+    <div class="player-container">
+        <div id="player1"></div>
+        <div id="player2"></div>
+    </div>
+
+    <script>
+        var player1, player2;
+        var player1Ready = false, player2Ready = false;
+        var videoLoaded = false;
+        var secondVideoHidden = false;
+
+        function onYouTubeIframeAPIReady() {
+            player1 = new YT.Player('player1', {
+                height: '360',
+                width: '640',
+                events: {
+                    'onReady': function() { player1Ready = true; }
+                }
+            });
+            player2 = new YT.Player('player2', {
+                height: '460',
+                width: '640',
+                events: {
+                    'onReady': function() { player2Ready = true; player2.mute(); }
+                }
+            });
+        }
+
+        function chargerVideoDepuisInput() {
+            navigator.clipboard.readText().then(clipText => {
+                if (clipText.includes('youtube.com/watch?v=')) {
+                    document.getElementById('videoUrl').value = clipText;
+                    chargerVideoDepuisURL(clipText);
+                } else {
+                    const urlInput = document.getElementById('videoUrl').value;
+                    if (urlInput.trim()) {
+                        chargerVideoDepuisURL(urlInput);
+                    } else {
+                        alert('Ni le presse-papier ni le champ texte ne contiennent une URL YouTube valide.');
+                    }
+                }
+            }).catch(() => {
+                alert('Impossible de lire le presse-papier.');
+            });
+        }
+
+        function chargerVideoDepuisURL(url) {
+            const videoId = new URL(url).searchParams.get('v');
+            if(player1Ready && player2Ready) {
+                player1.loadVideoById(videoId);
+                player2.loadVideoById({videoId: videoId, playerVars: {cc_lang_pref: 'zh-Hans', cc_load_policy: 1}});
+                player2.mute();
+                videoLoaded = true;
+                document.getElementById('syncBtn').disabled = false;
+            }
+        }
+
+        function playVideos() {
+            if(player1Ready && player2Ready && videoLoaded) {
+                player1.playVideo();
+                player2.playVideo();
+            }
+        }
+
+        function pauseVideos() {
+            if(player1Ready && player2Ready && videoLoaded) {
+                player1.pauseVideo();
+                player2.pauseVideo();
+            }
+        }
+
+        function stopVideos() {
+            if(player1Ready && player2Ready && videoLoaded) {
+                player1.stopVideo();
+                player2.stopVideo();
+            }
+        }
+
+        function setPlaybackRate() {
+            const speed = parseFloat(document.getElementById('speed').value);
+            if(player1Ready && player2Ready && videoLoaded) {
+                player1.setPlaybackRate(speed);
+                player2.setPlaybackRate(speed);
+            }
+        }
+
+        function synchronizeVideos() {
+            if(player1Ready && player2Ready && videoLoaded) {
+                let currentTime = player1.getCurrentTime();
+                player2.seekTo(currentTime);
+            }
+        }
+
+        function toggleSecondVideo() {
+            const player2Div = document.getElementById('player2');
+            player2Div.style.top = secondVideoHidden ? '0px' : '360px';
+            secondVideoHidden = !secondVideoHidden;
+        }
+    </script>
+</body>
+</html>
